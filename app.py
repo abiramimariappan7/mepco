@@ -2,11 +2,8 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# Set page config
+# Set page configuration
 st.set_page_config(page_title="Mepcrete Dashboard", layout="wide")
-
-# Title
-st.title("🏗️ Mepcrete Block & Salary Dashboard")
 
 # Load data
 @st.cache_data
@@ -19,8 +16,11 @@ def load_data():
 
 df_salary, df_blocks, df_inventory = load_data()
 
+# Title
+st.title("🏗️ Mepcrete AAC Block & Salary Dashboard")
+
 # Tabs
-tab1, tab2, tab3 = st.tabs(["📊 Inventory Analysis", "🧱 Block Calculator", "💼 Salary Insights"])
+tab1, tab2, tab3 = st.tabs(["📊 Inventory Analysis", "🧱 Block Estimator", "💼 Salary Insights"])
 
 # ------------------ TAB 1: INVENTORY ------------------
 with tab1:
@@ -28,11 +28,11 @@ with tab1:
     df_inventory['Date'] = pd.to_datetime(df_inventory['Date'])
     df_inventory.sort_values("Date", inplace=True)
     df_inventory_display = df_inventory.copy()
-    
+
     # Date filter
     min_date, max_date = df_inventory['Date'].min(), df_inventory['Date'].max()
     date_range = st.date_input("Select Date Range", [min_date, max_date])
-    
+
     if len(date_range) == 2:
         df_inventory_display = df_inventory[
             (df_inventory['Date'] >= pd.to_datetime(date_range[0])) &
@@ -57,27 +57,42 @@ with tab1:
                   title="Block Waste (kg)", color_continuous_scale='reds')
     st.plotly_chart(fig2, use_container_width=True)
 
-# ------------------ TAB 2: BLOCK CALCULATOR ------------------
+# ------------------ TAB 2: BLOCK ESTIMATOR ------------------
 with tab2:
-    st.subheader("🧮 Block Usage Calculator")
+    st.subheader("🏠 Block Estimator Based on Room Dimensions")
 
-    # Get average block volume
-    avg_volume = df_blocks['Volume (m3)'].mean()
+    block_volume = df_blocks['Volume (m3)'].mean()
 
-    user_input_volume = st.number_input("Enter total construction volume (m³)", min_value=0.0, step=0.1)
+    st.markdown("### 🔹 Enter Room Dimensions (in meters)")
+    length = st.number_input("Room Length (m)", min_value=1.0, step=0.5)
+    width = st.number_input("Room Width (m)", min_value=1.0, step=0.5)
+    height = st.number_input("Wall Height (m)", min_value=1.0, step=0.5)
 
-    if user_input_volume > 0:
-        blocks_needed = int(user_input_volume / avg_volume)
-        st.success(f"🔢 Approx. **{blocks_needed} blocks** are needed for {user_input_volume} m³")
+    st.markdown("### 🔹 Enter Openings")
+    num_doors = st.number_input("Number of Doors", min_value=0, step=1)
+    num_windows = st.number_input("Number of Windows", min_value=0, step=1)
 
-    st.markdown("##### Block Measurement Samples")
+    if st.button("Estimate Blocks Needed"):
+        wall_area = 2 * (length + width) * height
+        door_area = num_doors * 1.8  # 2m x 0.9m
+        window_area = num_windows * 1.44  # 1.2m x 1.2m
+        total_opening_area = door_area + window_area
+
+        wall_thickness = 0.1  # 10 cm
+        total_wall_volume = (wall_area - total_opening_area) * wall_thickness
+        blocks_required = total_wall_volume / block_volume
+
+        st.success(f"🧱 Estimated Blocks Required: **{int(blocks_required)}**")
+        st.caption(f"(Wall Volume: {total_wall_volume:.2f} m³, Avg Block Volume: {block_volume:.3f} m³)")
+
+    st.markdown("##### 📏 Sample Block Dimensions")
     st.dataframe(df_blocks.head(), use_container_width=True)
 
 # ------------------ TAB 3: SALARY ------------------
 with tab3:
     st.subheader("💼 Employee Salary Data")
 
-    st.markdown("#### 📋 Raw Data")
+    st.markdown("#### 📋 Data Table")
     st.dataframe(df_salary.head(), use_container_width=True)
 
     st.markdown("#### 📊 Salary vs Experience")
@@ -91,4 +106,4 @@ with tab3:
 
 # Footer
 st.markdown("---")
-st.markdown("Built by Abirami Mariappan | Mepcrete AAC Dashboard 🌟")
+st.markdown("📌 Developed by **Abirami Mariappan** | Powered by Mepcrete AAC 🌟")
