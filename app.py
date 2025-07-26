@@ -50,13 +50,13 @@ with tab1:
     with col3:
         st.metric("♻️ Waste (kg)", int(df_inventory_display['Waste (kg)'].sum()))
 
-    st.markdown("### 📈 Blocks Made vs Sold (First 200 Entries)")
-    fig1 = px.bar(df_inventory_display.head(200), x='Date', y=['Blocks Made', 'Blocks Sold'],
+    st.markdown("### 📈 Blocks Made vs Sold (First 100 Entries)")
+    fig1 = px.bar(df_inventory_display.head(100), x='Date', y=['Blocks Made', 'Blocks Sold'],
                   barmode='group', title="Blocks Made vs Sold Over Time")
     st.plotly_chart(fig1, use_container_width=True)
 
-    st.markdown("### 🧯 Waste Over Time (First 200 Entries)")
-    fig2 = px.bar(df_inventory_display.head(200), x='Date', y='Waste (kg)', color='Waste (kg)',
+    st.markdown("### 🧯 Waste Over Time (First 100 Entries)")
+    fig2 = px.bar(df_inventory_display.head(100), x='Date', y='Waste (kg)', color='Waste (kg)',
                   title="Block Waste (kg)", color_continuous_scale='reds')
     st.plotly_chart(fig2, use_container_width=True)
 
@@ -133,4 +133,4 @@ with tab3:
 
 # ------------------ FOOTER ------------------
 st.markdown("---")
-st.markdown("📌 Developed by **Abirami Mariappan** | 🎓 B.Tech IT | Internship @ Mepcrete AAC")
+st.markdown("📌 Developed by **Abirami M** | 🎓 B.Tech IT | Internship @ Mepcrete AAC")
