@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import openpyxl # Added this as it was an optional dependency for pandas with Excel files
+import openpyxl # This is necessary for pandas to read .xlsx files if you were using them, though we shifted to CSVs. Keeping it in case future changes involve Excel.
 
 st.set_page_config(page_title="Mepcrete AI Tool", layout="wide")
 
@@ -10,8 +10,8 @@ st.set_page_config(page_title="Mepcrete AI Tool", layout="wide")
 @st.cache_data
 def load_data():
     # Load each CSV file individually using pd.read_csv
-    # Ensure these filenames EXACTLY match the names of the CSV files
-    # in the root of your GitHub repository.
+    # IMPORTANT: Ensure these filenames EXACTLY match the names of the CSV files
+    # in the root of your GitHub repository (case-sensitive and including all spaces/characters).
     df_emp = pd.read_csv("mepcrete_data_combined.xlsx - Employee Salary Data.csv")
     df_block = pd.read_csv("mepcrete_data_combined.xlsx - AAC Block Measurements.csv")
     df_inv = pd.read_csv("mepcrete_data_combined.xlsx - Inventory Data.csv")
@@ -114,7 +114,7 @@ elif section == "📊 Inventory Analysis":
     # Assuming column names are correct as inferred from your CSV data snippets
     total_produced = df_inv["Blocks Made"].sum()
     total_sold = df_inv["Blocks Sold"].sum()
-    total_remaining = df_inv["Blocks Left"].sum() # Use "Blocks Left" as per CSV snippet
+    total_remaining = df_inv["Blocks Left"].sum() # Using "Blocks Left" as per your CSV snippet
     waste = df_inv["Waste (kg)"].sum()
 
     col1, col2, col3, col4 = st.columns(4)
