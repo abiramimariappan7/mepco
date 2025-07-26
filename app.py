@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error
 
 # Page setup
 st.set_page_config(page_title="MepcreteBlock: Smart Construction Dashboard", layout="wide")
@@ -47,13 +50,13 @@ with tab1:
     with col3:
         st.metric("♻️ Waste (kg)", int(df_inventory_display['Waste (kg)'].sum()))
 
-    st.markdown("### 📈 Blocks Made vs Sold")
-    fig1 = px.line(df_inventory_display, x='Date', y=['Blocks Made', 'Blocks Sold'],
-                   markers=True, title="Blocks Made vs Sold Over Time")
+    st.markdown("### 📈 Blocks Made vs Sold (First 200 Entries)")
+    fig1 = px.bar(df_inventory_display.head(200), x='Date', y=['Blocks Made', 'Blocks Sold'],
+                  barmode='group', title="Blocks Made vs Sold Over Time")
     st.plotly_chart(fig1, use_container_width=True)
 
-    st.markdown("### 🧯 Waste Over Time")
-    fig2 = px.bar(df_inventory_display, x='Date', y='Waste (kg)', color='Waste (kg)',
+    st.markdown("### 🧯 Waste Over Time (First 200 Entries)")
+    fig2 = px.bar(df_inventory_display.head(200), x='Date', y='Waste (kg)', color='Waste (kg)',
                   title="Block Waste (kg)", color_continuous_scale='reds')
     st.plotly_chart(fig2, use_container_width=True)
 
@@ -96,19 +99,37 @@ with tab3:
     st.dataframe(df_salary.head(), use_container_width=True)
 
     st.markdown("#### 📊 Salary Distribution by Job Title")
-    fig_box = px.box(df_salary, x='Job Title', y='Current Salary', points='all',
-                     title="Salary Distribution per Job Title")
-    st.plotly_chart(fig_box, use_container_width=True)
+    fig_bar_job = px.bar(df_salary.head(200), x='Job Title', y='Current Salary',
+                         title="Salary by Job Title", color='Current Salary')
+    st.plotly_chart(fig_bar_job, use_container_width=True)
 
     st.markdown("#### 📊 Average Salary by Department")
     if 'Department' in df_salary.columns:
         avg_salary_dept = df_salary.groupby('Department')['Current Salary'].mean().reset_index()
-        fig_bar = px.bar(avg_salary_dept, x='Department', y='Current Salary',
-                         title="Average Salary by Department", color='Current Salary')
-        st.plotly_chart(fig_bar, use_container_width=True)
+        fig_bar_dept = px.bar(avg_salary_dept, x='Department', y='Current Salary',
+                              title="Average Salary by Department", color='Current Salary')
+        st.plotly_chart(fig_bar_dept, use_container_width=True)
 
     avg_salary = int(df_salary['Current Salary'].mean())
     st.metric("💰 Average Salary", f"₹{avg_salary}")
+
+    st.markdown("#### 🤖 Predict Salary Based on Features")
+    selected_features = ['Years of Experience', 'Workload (Hours/Week)']
+    X = df_salary[selected_features]
+    y = df_salary['Current Salary']
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    model = LinearRegression()
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    mse = mean_squared_error(y_test, y_pred)
+
+    st.markdown(f"**Model MSE:** {mse:.2f}")
+
+    years = st.slider("Years of Experience", 0, 40, 5)
+    hours = st.slider("Workload (Hours/Week)", 10, 80, 40)
+    pred_salary = model.predict([[years, hours]])[0]
+    st.success(f"Predicted Salary: ₹{int(pred_salary)}")
 
 # ------------------ FOOTER ------------------
 st.markdown("---")
