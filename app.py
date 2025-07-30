@@ -5,132 +5,97 @@ from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
 
-# Page setup
-st.set_page_config(page_title="MepcreteBlock: Smart Construction Dashboard", layout="wide")
+st.set_page_config(page_title="Mepcrete Data Analyzer", layout="wide")
+st.title("🏗️ Mepcrete Data Analyzer Dashboard")
 
-# Load data
-@st.cache_data
-def load_data():
-    excel_path = "mepcrete_data_combined.xlsx"
-    df_salary = pd.read_excel(excel_path, sheet_name='Employee Salary Data')
-    df_blocks = pd.read_excel(excel_path, sheet_name='AAC Block Measurements')
-    df_inventory = pd.read_excel(excel_path, sheet_name='Inventory Data')
-    return df_salary, df_blocks, df_inventory
+uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"])
+if uploaded_file:
+    df = pd.read_excel(uploaded_file, engine="openpyxl")
+    st.success("Data successfully loaded!")
 
-df_salary, df_blocks, df_inventory = load_data()
+    # Department-based Salary Adjustment
+    dept_salary_factor = {
+        'Engineering': 1.2,
+        'Marketing': 0.9,
+        'HR': 1.0,
+        'Operations': 0.8,
+        'Sales': 1.1,
+        'Admin': 0.85,
+        'Finance': 1.15
+    }
+    if 'Current Salary' in df.columns and 'Department' in df.columns:
+        df['Adjusted Salary'] = df.apply(
+            lambda row: row['Current Salary'] * dept_salary_factor.get(row['Department'], 1.0), axis=1
+        )
 
-# App title
-st.title("🏗️ MepcreteBlock: Smart Estimator & Inventory Dashboard")
+    # Show raw data
+    with st.expander("📄 View Raw Data"):
+        st.dataframe(df.head(50))
 
-# Tabs
-tab1, tab2, tab3 = st.tabs(["📊 Inventory Analysis", "🧱 Block Estimator", "💼 Salary Insights"])
+    # Filter by Data Type
+    if 'Adjusted Salary' in df.columns and 'Job Title' in df.columns:
+        emp_df = df.dropna(subset=["Adjusted Salary", "Job Title"])
 
-# ------------------ TAB 1: INVENTORY ------------------
-with tab1:
-    st.subheader("Inventory Data Overview")
-    df_inventory['Date'] = pd.to_datetime(df_inventory['Date'])
-    df_inventory.sort_values("Date", inplace=True)
-    df_inventory_display = df_inventory.copy()
+        st.subheader("📊 Employee Salary Insights")
 
-    # Date filter
-    min_date, max_date = df_inventory['Date'].min(), df_inventory['Date'].max()
-    date_range = st.date_input("Select Date Range", [min_date, max_date])
+        # Average Salary by Job Title
+        job_salary_avg = emp_df.groupby("Job Title")["Adjusted Salary"].mean().sort_values(ascending=False).reset_index()
+        fig_job = px.bar(job_salary_avg, x="Job Title", y="Adjusted Salary",
+                         title="Average Adjusted Salary by Job Title",
+                         text_auto='.2s', color="Adjusted Salary",
+                         color_continuous_scale="Purples")
+        fig_job.update_layout(template="plotly_white")
+        st.plotly_chart(fig_job, use_container_width=True)
 
-    if len(date_range) == 2:
-        df_inventory_display = df_inventory[
-            (df_inventory['Date'] >= pd.to_datetime(date_range[0])) &
-            (df_inventory['Date'] <= pd.to_datetime(date_range[1]))
-        ]
+        # Average Salary by Department
+        if 'Department' in df.columns:
+            dept_salary_avg = emp_df.groupby("Department")["Adjusted Salary"].mean().sort_values(ascending=False).reset_index()
+            fig_dept = px.bar(dept_salary_avg, x="Department", y="Adjusted Salary",
+                              title="Average Adjusted Salary by Department",
+                              text_auto='.2s', color="Adjusted Salary",
+                              color_continuous_scale="Purples")
+            fig_dept.update_layout(template="plotly_white")
+            st.plotly_chart(fig_dept, use_container_width=True)
 
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("📦 Blocks Made", int(df_inventory_display['Blocks Made'].sum()))
-    with col2:
-        st.metric("📤 Blocks Sold", int(df_inventory_display['Blocks Sold'].sum()))
-    with col3:
-        st.metric("♻️ Waste (kg)", int(df_inventory_display['Waste (kg)'].sum()))
+    # ML: Salary Prediction
+    if 'Adjusted Salary' in df.columns and 'Experience (Years)' in df.columns:
+        st.subheader("🤖 Predict Adjusted Salary using Experience")
+        ml_df = df.dropna(subset=['Adjusted Salary', 'Experience (Years)'])
 
-    st.markdown("### 📈 Blocks Made vs Sold (First 100 Entries)")
-    fig1 = px.bar(df_inventory_display.head(100), x='Date', y=['Blocks Made', 'Blocks Sold'],
-                  barmode='group', title="Blocks Made vs Sold Over Time")
-    st.plotly_chart(fig1, use_container_width=True)
+        X = ml_df[['Experience (Years)']]
+        y = ml_df['Adjusted Salary']
 
-    st.markdown("### 🧯 Waste Over Time (First 100 Entries)")
-    fig2 = px.bar(df_inventory_display.head(100), x='Date', y='Waste (kg)', color='Waste (kg)',
-                  title="Block Waste (kg)", color_continuous_scale='reds')
-    st.plotly_chart(fig2, use_container_width=True)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        model = LinearRegression()
+        model.fit(X_train, y_train)
+        y_pred = model.predict(X_test)
 
-# ------------------ TAB 2: BLOCK ESTIMATOR ------------------
-with tab2:
-    st.subheader("🏠 Block Estimator Based on Room Dimensions")
+        st.write(f"Model Accuracy (Lower RMSE = Better): {mean_squared_error(y_test, y_pred, squared=False):.2f}")
 
-    block_volume = df_blocks['Volume (m3)'].mean()
+        exp_input = st.number_input("Enter Years of Experience", min_value=0.0, step=0.5)
+        if exp_input:
+            predicted_salary = model.predict([[exp_input]])[0]
+            st.success(f"Predicted Adjusted Salary: ₹{predicted_salary:,.2f}")
 
-    st.markdown("### 🔹 Enter Room Dimensions (in meters)")
-    length = st.number_input("Room Length (m)", min_value=1.0, step=0.5)
-    width = st.number_input("Room Width (m)", min_value=1.0, step=0.5)
-    height = st.number_input("Wall Height (m)", min_value=1.0, step=0.5)
+    # Block Estimator Tool
+    st.subheader("📐 Block Estimator")
+    length = st.number_input("Room Length (ft)", min_value=1.0)
+    width = st.number_input("Room Width (ft)", min_value=1.0)
+    height = st.number_input("Room Height (ft)", min_value=1.0)
 
-    st.markdown("### 🔹 Enter Openings")
+    door_area = 21  # Average door area (ft^2)
+    window_area = 12  # Average window area (ft^2)
     num_doors = st.number_input("Number of Doors", min_value=0, step=1)
     num_windows = st.number_input("Number of Windows", min_value=0, step=1)
 
-    if st.button("Estimate Blocks Needed"):
-        wall_area = 2 * (length + width) * height
-        door_area = num_doors * 1.8  # standard door area
-        window_area = num_windows * 1.44  # standard window area
-        total_opening_area = door_area + window_area
+    block_length = 1.3  # ft
+    block_height = 0.67  # ft
+    block_thickness = 0.33  # ft (Assuming standard AAC block)
+    block_area = block_length * block_height
 
-        wall_thickness = 0.1  # 10 cm thick
-        total_wall_volume = (wall_area - total_opening_area) * wall_thickness
-        blocks_required = total_wall_volume / block_volume
-
-        st.success(f"🧱 Estimated Blocks Required: **{int(blocks_required)}**")
-        st.caption(f"(Wall Volume: {total_wall_volume:.2f} m³, Block Volume: {block_volume:.3f} m³)")
-
-    st.markdown("##### 📏 Sample Block Measurements")
-    st.dataframe(df_blocks.head(), use_container_width=True)
-
-# ------------------ TAB 3: SALARY ------------------
-with tab3:
-    st.subheader("💼 Employee Salary Insights")
-
-    st.markdown("#### 📋 Data Preview")
-    st.dataframe(df_salary.head(), use_container_width=True)
-
-    st.markdown("#### 📊 Salary Distribution by Job Title")
-    fig_bar_job = px.bar(df_salary.head(200), x='Job Title', y='Current Salary',
-                         title="Salary by Job Title", color='Current Salary')
-    st.plotly_chart(fig_bar_job, use_container_width=True)
-
-    st.markdown("#### 📊 Average Salary by Department")
-    if 'Department' in df_salary.columns:
-        avg_salary_dept = df_salary.groupby('Department')['Current Salary'].mean().reset_index()
-        fig_bar_dept = px.bar(avg_salary_dept, x='Department', y='Current Salary',
-                              title="Average Salary by Department", color='Current Salary')
-        st.plotly_chart(fig_bar_dept, use_container_width=True)
-
-    avg_salary = int(df_salary['Current Salary'].mean())
-    st.metric("💰 Average Salary", f"₹{avg_salary}")
-
-    st.markdown("#### 🤖 Predict Salary Based on Features")
-    selected_features = ['Years of Experience', 'Workload (Hours/Week)']
-    X = df_salary[selected_features]
-    y = df_salary['Current Salary']
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-    model = LinearRegression()
-    model.fit(X_train, y_train)
-    y_pred = model.predict(X_test)
-    mse = mean_squared_error(y_test, y_pred)
-
-    st.markdown(f"**Model MSE:** {mse:.2f}")
-
-    years = st.slider("Years of Experience", 0, 40, 5)
-    hours = st.slider("Workload (Hours/Week)", 10, 80, 40)
-    pred_salary = model.predict([[years, hours]])[0]
-    st.success(f"Predicted Salary: ₹{int(pred_salary)}")
-
-# ------------------ FOOTER ------------------
-st.markdown("---")
-st.markdown("📌 Developed by **Abirami M** | 🎓 B.Tech IT | Internship @ Mepcrete AAC")
+    if st.button("Estimate Blocks"):
+        wall_area = 2 * height * (length + width)
+        opening_area = (door_area * num_doors) + (window_area * num_windows)
+        net_wall_area = wall_area - opening_area
+        blocks_needed = net_wall_area / block_area
+        st.info(f"🧱 Estimated Blocks Required: {int(blocks_needed)}")
